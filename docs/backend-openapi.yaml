@@ -1,0 +1,2341 @@
+﻿~openapi: 3.0.3
+info:
+  title: 儿童 AI 英语眼镜后端 API（第一版草稿）
+  version: 0.1.0
+  description: |
+    适用于家长端 APP、眼镜设备、Web 管理后台的统一接口草稿。
+    生成日期：2026-03-26。
+    设计目标：优先支撑标准版主链路，同时为 Pro/Max 版的拍照、对讲、实时图传、远程关机等扩展能力预留字段。
+servers:
+  - url: https://api.example.com
+    description: 生产环境（示例）
+  - url: https://staging-api.example.com
+    description: 预发布环境（示例）
+tags:
+  - name: AppAuth
+  - name: AppProfile
+  - name: AppDevices
+  - name: AppLearning
+  - name: AppContent
+  - name: AppSupport
+  - name: DeviceBridge
+  - name: AdminAuth
+  - name: AdminContent
+  - name: AdminDevices
+  - name: AdminUsers
+  - name: AdminSystem
+paths:
+  /app/v1/auth/sms-code:
+    post:
+      tags: [AppAuth]
+      summary: 发送短信验证码
+      operationId: sendAppSmsCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SmsCodeRequest'
+      responses:
+        '200':
+          description: 验证码发送成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+        '400':
+          description: 参数错误或发送频控
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /app/v1/auth/login:
+    post:
+      tags: [AppAuth]
+      summary: 短信验证码登录
+      operationId: appLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppLoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requestId, data]
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/UserSession'
+        '401':
+          description: 验证码错误或已失效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /app/v1/auth/logout:
+    post:
+      tags: [AppAuth]
+      summary: 退出登录
+      operationId: appLogout
+      security:
+        - appBearerAuth: []
+      responses:
+        '200':
+          description: 退出成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /app/v1/auth/account-deletion:
+    post:
+      tags: [AppAuth]
+      summary: 提交账号注销申请
+      operationId: requestAccountDeletion
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirmText]
+              properties:
+                confirmText:
+                  type: string
+                  example: 注销账号
+                reason:
+                  type: string
+                  maxLength: 200
+      responses:
+        '200':
+          description: 注销申请已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      deletionEffectiveAt:
+                        type: string
+                        format: date-time
+                      retentionNotice:
+                        type: string
+
+  /app/v1/users/me:
+    get:
+      tags: [AppProfile]
+      summary: 获取当前用户基础信息
+      operationId: getCurrentUser
+      security:
+        - appBearerAuth: []
+      responses:
+        '200':
+          description: 当前用户信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/UserProfile'
+
+  /app/v1/users/me/agreements:
+    post:
+      tags: [AppProfile]
+      summary: 提交协议同意记录
+      operationId: acceptAgreements
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userAgreementVersion, privacyPolicyVersion, childPrivacyVersion]
+              properties:
+                userAgreementVersion:
+                  type: string
+                privacyPolicyVersion:
+                  type: string
+                childPrivacyVersion:
+                  type: string
+      responses:
+        '200':
+          description: 提交成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /app/v1/children/profile:
+    get:
+      tags: [AppProfile]
+      summary: 获取孩子资料
+      operationId: getChildProfile
+      security:
+        - appBearerAuth: []
+      responses:
+        '200':
+          description: 孩子资料
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/ChildProfile'
+    put:
+      tags: [AppProfile]
+      summary: 更新孩子资料
+      operationId: updateChildProfile
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChildProfile'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /app/v1/devices:
+    get:
+      tags: [AppDevices]
+      summary: 获取已绑定设备列表
+      operationId: listUserDevices
+      security:
+        - appBearerAuth: []
+      responses:
+        '200':
+          description: 设备列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      currentDeviceId:
+                        type: string
+                        format: uuid
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DeviceSummary'
+
+  /app/v1/devices/bind:
+    post:
+      tags: [AppDevices]
+      summary: 绑定设备
+      description: APP 先通过 BLE 完成本地校验，再调用后端建立绑定关系。最后绑定的手机自动获得唯一管控权。
+      operationId: bindDevice
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId, modelCode, bluetoothMac]
+              properties:
+                deviceId:
+                  type: string
+                  format: uuid
+                modelCode:
+                  type: string
+                  enum: [STD, PRO, MAX]
+                bluetoothMac:
+                  type: string
+                deviceName:
+                  type: string
+                forceRebind:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: 绑定成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/DeviceSummary'
+        '409':
+          description: 设备已被其他用户绑定且不允许抢占
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /app/v1/devices/current:
+    put:
+      tags: [AppDevices]
+      summary: 切换当前管控设备
+      operationId: switchCurrentDevice
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId]
+              properties:
+                deviceId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: 切换成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /app/v1/devices/{deviceId}/unbind:
+    post:
+      tags: [AppDevices]
+      summary: 解绑设备
+      operationId: unbindDevice
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: 解绑成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /app/v1/devices/{deviceId}/status:
+    get:
+      tags: [AppDevices]
+      summary: 获取设备实时状态
+      operationId: getDeviceStatus
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: 设备状态
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/DeviceStatus'
+
+  /app/v1/devices/{deviceId}/policies:
+    get:
+      tags: [AppDevices]
+      summary: 获取设备管控策略
+      operationId: getDevicePolicies
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: 当前策略
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/DevicePolicy'
+    put:
+      tags: [AppDevices]
+      summary: 更新设备管控策略
+      operationId: updateDevicePolicies
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DevicePolicy'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /app/v1/devices/{deviceId}/commands:
+    post:
+      tags: [AppDevices]
+      summary: 下发设备指令
+      description: 适用于锁屏、解锁、远程关机、重启、校准电量等即时指令。离线设备默认入队 24 小时。
+      operationId: createDeviceCommand
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommandRequest'
+      responses:
+        '200':
+          description: 指令创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/CommandRecord'
+
+  /app/v1/devices/{deviceId}/commands/{commandId}:
+    get:
+      tags: [AppDevices]
+      summary: 查询指令执行结果
+      operationId: getDeviceCommand
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - $ref: '#/components/parameters/CommandId'
+      responses:
+        '200':
+          description: 指令详情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/CommandRecord'
+
+  /app/v1/devices/{deviceId}/ota/check:
+    get:
+      tags: [AppDevices]
+      summary: 检查设备 OTA 更新
+      operationId: checkOtaUpdate
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: OTA 检测结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/OtaCheckResult'
+
+  /app/v1/devices/{deviceId}/ota/tasks:
+    post:
+      tags: [AppDevices]
+      summary: 创建 OTA 升级任务
+      operationId: createOtaTask
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [packageId]
+              properties:
+                packageId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: 升级任务创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/OtaTask'
+        '422':
+          description: 电量不足或设备不在线
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /app/v1/devices/{deviceId}/ota/tasks/{taskId}:
+    get:
+      tags: [AppDevices]
+      summary: 查询 OTA 升级任务状态
+      operationId: getOtaTask
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 升级任务详情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/OtaTask'
+
+  /app/v1/learning/summary:
+    get:
+      tags: [AppLearning]
+      summary: 获取学习概览
+      operationId: getLearningSummary
+      security:
+        - appBearerAuth: []
+      parameters:
+        - name: deviceId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month]
+      responses:
+        '200':
+          description: 学习概览
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/LearningSummary'
+
+  /app/v1/learning/words:
+    get:
+      tags: [AppLearning]
+      summary: 获取生词本
+      operationId: listLearningWords
+      security:
+        - appBearerAuth: []
+      parameters:
+        - name: deviceId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date
+        - $ref: '#/components/parameters/PageNo'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 生词列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LearningWord'
+                      meta:
+                        $ref: '#/components/schemas/PageMeta'
+
+  /app/v1/learning/practices:
+    get:
+      tags: [AppLearning]
+      summary: 获取跟读纠音记录
+      operationId: listReadingPractices
+      security:
+        - appBearerAuth: []
+      parameters:
+        - name: deviceId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageNo'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 跟读记录
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReadingPracticeRecord'
+                      meta:
+                        $ref: '#/components/schemas/PageMeta'
+
+  /app/v1/learning/reports:
+    post:
+      tags: [AppLearning]
+      summary: 生成学习报告
+      operationId: createLearningReport
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId, reportType]
+              properties:
+                deviceId:
+                  type: string
+                  format: uuid
+                reportType:
+                  type: string
+                  enum: [daily, weekly, monthly]
+                reportDate:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: 报告生成成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/LearningReport'
+
+  /app/v1/learning/reports/{reportId}:
+    get:
+      tags: [AppLearning]
+      summary: 获取学习报告详情
+      operationId: getLearningReport
+      security:
+        - appBearerAuth: []
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 学习报告详情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/LearningReport'
+
+  /app/v1/checkin/plans:
+    get:
+      tags: [AppLearning]
+      summary: 获取学习打卡计划
+      operationId: listCheckinPlans
+      security:
+        - appBearerAuth: []
+      parameters:
+        - name: deviceId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 打卡计划列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CheckinPlan'
+    post:
+      tags: [AppLearning]
+      summary: 创建学习打卡计划
+      operationId: createCheckinPlan
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckinPlan'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /app/v1/checkin/plans/{planId}:
+    put:
+      tags: [AppLearning]
+      summary: 更新学习打卡计划
+      operationId: updateCheckinPlan
+      security:
+        - appBearerAuth: []
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckinPlan'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /app/v1/content/catalog:
+    get:
+      tags: [AppContent]
+      summary: 获取内容目录与最新版本
+      operationId: getContentCatalog
+      security:
+        - appBearerAuth: []
+      parameters:
+        - name: deviceId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 内容目录
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ContentPackage'
+
+  /app/v1/content/packages/{packageId}/download-url:
+    get:
+      tags: [AppContent]
+      summary: 获取内容包下载地址
+      operationId: getContentPackageDownloadUrl
+      security:
+        - appBearerAuth: []
+      parameters:
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 下载地址
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      packageId:
+                        type: string
+                        format: uuid
+                      downloadUrl:
+                        type: string
+                        format: uri
+                      expiresAt:
+                        type: string
+                        format: date-time
+
+  /app/v1/push/tokens:
+    post:
+      tags: [AppSupport]
+      summary: 注册推送 Token
+      operationId: registerPushToken
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushTokenRegistration'
+      responses:
+        '200':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /app/v1/feedback/tickets:
+    post:
+      tags: [AppSupport]
+      summary: 提交问题反馈工单
+      operationId: createFeedbackTicket
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackTicket'
+      responses:
+        '200':
+          description: 工单创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/FeedbackTicket'
+
+  /app/v1/uploads/presign:
+    post:
+      tags: [AppSupport]
+      summary: 获取日志上传预签名地址
+      operationId: createUploadPresign
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bizType, fileName, contentType]
+              properties:
+                bizType:
+                  type: string
+                  enum: [app_log, crash_log, diagnostic_bundle]
+                fileName:
+                  type: string
+                contentType:
+                  type: string
+      responses:
+        '200':
+          description: 预签名地址
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      objectKey:
+                        type: string
+                      uploadUrl:
+                        type: string
+                        format: uri
+                      expiresAt:
+                        type: string
+                        format: date-time
+
+  /device/v1/status-reports:
+    post:
+      tags: [DeviceBridge]
+      summary: 设备状态上报
+      operationId: reportDeviceStatus
+      security:
+        - deviceTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceStatusReport'
+      responses:
+        '200':
+          description: 状态上报成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /device/v1/commands/pull:
+    post:
+      tags: [DeviceBridge]
+      summary: 设备拉取待执行指令
+      operationId: pullPendingCommands
+      security:
+        - deviceTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId]
+              properties:
+                deviceId:
+                  type: string
+                  format: uuid
+                lastAckCommandId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: 待执行指令列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CommandRecord'
+
+  /device/v1/commands/{commandId}/result:
+    post:
+      tags: [DeviceBridge]
+      summary: 回传设备指令执行结果
+      operationId: reportCommandResult
+      security:
+        - deviceTokenAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CommandId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [device_ack, succeeded, failed, expired]
+                errorCode:
+                  type: string
+                errorMessage:
+                  type: string
+                executedAt:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: 回执成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /device/v1/learning-sync:
+    post:
+      tags: [DeviceBridge]
+      summary: 上报学习数据批次
+      operationId: syncDeviceLearningData
+      security:
+        - deviceTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceLearningBatch'
+      responses:
+        '200':
+          description: 学习数据接收成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      accepted:
+                        type: boolean
+                      nextCursor:
+                        type: string
+
+  /device/v1/ota/check:
+    post:
+      tags: [DeviceBridge]
+      summary: 设备侧检查可升级固件
+      operationId: deviceCheckOta
+      security:
+        - deviceTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId, firmwareVersion, batteryLevel]
+              properties:
+                deviceId:
+                  type: string
+                  format: uuid
+                firmwareVersion:
+                  type: string
+                batteryLevel:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+      responses:
+        '200':
+          description: OTA 检查结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/OtaCheckResult'
+
+  /device/v1/ota/tasks/{taskId}/progress:
+    post:
+      tags: [DeviceBridge]
+      summary: 回传 OTA 升级进度
+      operationId: reportOtaProgress
+      security:
+        - deviceTokenAuth: []
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status, progressPercent]
+              properties:
+                status:
+                  type: string
+                  enum: [pending, downloading, transferring, upgrading, rollback, succeeded, failed]
+                progressPercent:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                errorCode:
+                  type: string
+                errorMessage:
+                  type: string
+      responses:
+        '200':
+          description: 进度上报成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /device/v1/content/check:
+    post:
+      tags: [DeviceBridge]
+      summary: 检查可下发内容包
+      operationId: deviceCheckContent
+      security:
+        - deviceTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId, modelCode]
+              properties:
+                deviceId:
+                  type: string
+                  format: uuid
+                modelCode:
+                  type: string
+                  enum: [STD, PRO, MAX]
+                installedContentVersions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: 内容更新检查结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ContentPackage'
+
+  /admin/v1/auth/login:
+    post:
+      tags: [AdminAuth]
+      summary: 后台管理端登录
+      operationId: adminLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, password]
+              properties:
+                phone:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/AdminSession'
+        '401':
+          description: 账号或密码错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/v1/content/packages:
+    get:
+      tags: [AdminContent]
+      summary: 查询内容包列表
+      operationId: adminListContentPackages
+      security:
+        - adminBearerAuth: []
+      parameters:
+        - name: packageType
+          in: query
+          schema:
+            type: string
+            enum: [wordbook, audio]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, review, published, archived]
+        - $ref: '#/components/parameters/PageNo'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 内容包列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ContentPackage'
+                      meta:
+                        $ref: '#/components/schemas/PageMeta'
+    post:
+      tags: [AdminContent]
+      summary: 创建内容包
+      operationId: adminCreateContentPackage
+      security:
+        - adminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentPackage'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /admin/v1/content/packages/{packageId}/publish:
+    post:
+      tags: [AdminContent]
+      summary: 发布内容包
+      operationId: adminPublishContentPackage
+      security:
+        - adminBearerAuth: []
+      parameters:
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [publishMode]
+              properties:
+                publishMode:
+                  type: string
+                  enum: [manual, auto]
+      responses:
+        '200':
+          description: 发布成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /admin/v1/firmware/packages:
+    get:
+      tags: [AdminContent]
+      summary: 查询固件包列表
+      operationId: adminListFirmwarePackages
+      security:
+        - adminBearerAuth: []
+      parameters:
+        - name: modelCode
+          in: query
+          schema:
+            type: string
+            enum: [STD, PRO, MAX]
+        - $ref: '#/components/parameters/PageNo'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 固件包列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/FirmwarePackage'
+                      meta:
+                        $ref: '#/components/schemas/PageMeta'
+    post:
+      tags: [AdminContent]
+      summary: 上传固件包元数据
+      operationId: adminCreateFirmwarePackage
+      security:
+        - adminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FirmwarePackage'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /admin/v1/firmware/releases:
+    post:
+      tags: [AdminContent]
+      summary: 创建固件发布任务
+      operationId: adminCreateFirmwareRelease
+      security:
+        - adminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FirmwareReleaseJob'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /admin/v1/devices:
+    get:
+      tags: [AdminDevices]
+      summary: 查询设备列表
+      operationId: adminListDevices
+      security:
+        - adminBearerAuth: []
+      parameters:
+        - name: modelCode
+          in: query
+          schema:
+            type: string
+            enum: [STD, PRO, MAX]
+        - name: onlineStatus
+          in: query
+          schema:
+            type: string
+            enum: [online, offline, disconnected]
+        - name: firmwareVersion
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/PageNo'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 设备列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DeviceSummary'
+                      meta:
+                        $ref: '#/components/schemas/PageMeta'
+
+  /admin/v1/devices/{deviceId}/unbind:
+    post:
+      tags: [AdminDevices]
+      summary: 后台远程解绑设备
+      operationId: adminUnbindDevice
+      security:
+        - adminBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: 解绑成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /admin/v1/users:
+    get:
+      tags: [AdminUsers]
+      summary: 查询用户列表
+      operationId: adminListUsers
+      security:
+        - adminBearerAuth: []
+      parameters:
+        - name: phone
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, locked, deleted]
+        - $ref: '#/components/parameters/PageNo'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 用户列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UserProfile'
+                      meta:
+                        $ref: '#/components/schemas/PageMeta'
+
+  /admin/v1/system/feature-flags:
+    get:
+      tags: [AdminSystem]
+      summary: 获取全局功能开关配置
+      operationId: adminListFeatureFlags
+      security:
+        - adminBearerAuth: []
+      responses:
+        '200':
+          description: 功能开关配置
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/FeatureFlag'
+    put:
+      tags: [AdminSystem]
+      summary: 更新功能开关配置
+      operationId: adminUpdateFeatureFlags
+      security:
+        - adminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FeatureFlag'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleSuccessResponse'
+
+  /admin/v1/reports/exports:
+    post:
+      tags: [AdminSystem]
+      summary: 创建报表导出任务
+      operationId: adminCreateReportExport
+      security:
+        - adminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reportType, timeRange]
+              properties:
+                reportType:
+                  type: string
+                  enum: [user_learning, device_activation, device_online_rate, firmware_success_rate, content_delivery]
+                timeRange:
+                  type: object
+                  required: [dateFrom, dateTo]
+                  properties:
+                    dateFrom:
+                      type: string
+                      format: date
+                    dateTo:
+                      type: string
+                      format: date
+                exportFormat:
+                  type: string
+                  enum: [xlsx, pdf]
+      responses:
+        '200':
+          description: 导出任务已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      exportJobId:
+                        type: string
+                        format: uuid
+                      status:
+                        type: string
+                        enum: [queued, processing, completed, failed]
+
+components:
+  securitySchemes:
+    appBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    adminBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    deviceTokenAuth:
+      type: apiKey
+      in: header
+      name: X-Device-Token
+  parameters:
+    DeviceId:
+      name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CommandId:
+      name: commandId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PageNo:
+      name: pageNo
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  schemas:
+    SimpleSuccessResponse:
+      type: object
+      required: [requestId, success]
+      properties:
+        requestId:
+          type: string
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: OK
+    ErrorResponse:
+      type: object
+      required: [requestId, code, message]
+      properties:
+        requestId:
+          type: string
+        code:
+          type: string
+          example: DEVICE_OFFLINE
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+    PageMeta:
+      type: object
+      properties:
+        pageNo:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        hasNext:
+          type: boolean
+    SmsCodeRequest:
+      type: object
+      required: [phone, purpose]
+      properties:
+        phone:
+          type: string
+          example: '13800138000'
+        purpose:
+          type: string
+          enum: [login, reset_password]
+    AppLoginRequest:
+      type: object
+      required: [phone, smsCode, loginDevice]
+      properties:
+        phone:
+          type: string
+        smsCode:
+          type: string
+        loginDevice:
+          type: object
+          properties:
+            platform:
+              type: string
+              enum: [android, ios]
+            appVersion:
+              type: string
+            deviceModel:
+              type: string
+            osVersion:
+              type: string
+    UserProfile:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        phoneMasked:
+          type: string
+        status:
+          type: string
+          enum: [active, locked, deleted]
+        hasAcceptedPolicies:
+          type: boolean
+        currentDeviceId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+    UserSession:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+          example: 7200
+        user:
+          $ref: '#/components/schemas/UserProfile'
+    ChildProfile:
+      type: object
+      properties:
+        childId:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+          maxLength: 32
+        age:
+          type: integer
+          minimum: 2
+          maximum: 12
+        learningStage:
+          type: string
+          enum: [启蒙, 初级, 进阶]
+        updatedAt:
+          type: string
+          format: date-time
+    DeviceFeatureSet:
+      type: object
+      properties:
+        aiCorrectionEnabled:
+          type: boolean
+        sceneRecognitionEnabled:
+          type: boolean
+        bluetoothAudioEnabled:
+          type: boolean
+        photoCaptureEnabled:
+          type: boolean
+        intercomEnabled:
+          type: boolean
+        eyeCareReminderEnabled:
+          type: boolean
+        liveStreamEnabled:
+          type: boolean
+    DeviceSummary:
+      type: object
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        modelCode:
+          type: string
+          enum: [STD, PRO, MAX]
+        deviceName:
+          type: string
+        remarkName:
+          type: string
+        bluetoothMac:
+          type: string
+        firmwareVersion:
+          type: string
+        batteryLevel:
+          type: integer
+        onlineStatus:
+          type: string
+          enum: [online, offline, disconnected]
+        isCurrent:
+          type: boolean
+        lastSeenAt:
+          type: string
+          format: date-time
+        features:
+          $ref: '#/components/schemas/DeviceFeatureSet'
+    DeviceStatus:
+      type: object
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        modelCode:
+          type: string
+          enum: [STD, PRO, MAX]
+        batteryLevel:
+          type: integer
+          minimum: 0
+          maximum: 100
+        batteryState:
+          type: string
+          enum: [normal, low_20, low_10, charging]
+        bluetoothConnected:
+          type: boolean
+        wifiApConnected:
+          type: boolean
+        firmwareVersion:
+          type: string
+        currentMode:
+          type: string
+          enum: [idle, learning, locked, power_save, upgrading, streaming, intercom]
+        latestAlertCode:
+          type: string
+        lastSeenAt:
+          type: string
+          format: date-time
+        features:
+          $ref: '#/components/schemas/DeviceFeatureSet'
+    DevicePolicy:
+      type: object
+      properties:
+        maxVolumeDb:
+          type: integer
+          minimum: 50
+          maximum: 100
+          default: 85
+        volumeButtonLocked:
+          type: boolean
+        singleSessionLimitMinutes:
+          type: integer
+          enum: [10, 20, 30, 45, 60]
+        dailyLimitMinutes:
+          type: integer
+          minimum: 10
+          maximum: 600
+        powerSaveEnabled:
+          type: boolean
+        eyeCareIntervalMinutes:
+          type: integer
+          enum: [15, 20, 30]
+        photoAutoSyncEnabled:
+          type: boolean
+        photoCapturePermissionEnabled:
+          type: boolean
+        features:
+          $ref: '#/components/schemas/DeviceFeatureSet'
+    CommandRequest:
+      type: object
+      required: [commandType]
+      properties:
+        commandType:
+          type: string
+          enum:
+            - lock_screen
+            - unlock_screen
+            - shutdown
+            - reboot
+            - calibrate_battery
+            - start_photo_sync
+            - stop_photo_sync
+            - start_live_stream
+            - stop_live_stream
+            - set_volume
+            - set_duration_limit
+            - set_power_save
+            - set_eye_care
+            - set_feature_switches
+        payload:
+          type: object
+          additionalProperties: true
+        offlineTtlHours:
+          type: integer
+          default: 24
+    CommandRecord:
+      type: object
+      properties:
+        commandId:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        commandType:
+          type: string
+        status:
+          type: string
+          enum: [queued, delivered, device_ack, succeeded, failed, expired, canceled]
+        payload:
+          type: object
+          additionalProperties: true
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        executedAt:
+          type: string
+          format: date-time
+        expireAt:
+          type: string
+          format: date-time
+    OtaPackage:
+      type: object
+      properties:
+        packageId:
+          type: string
+          format: uuid
+        modelCode:
+          type: string
+          enum: [STD, PRO, MAX]
+        version:
+          type: string
+        fileSizeBytes:
+          type: integer
+        checksumSha256:
+          type: string
+        forceUpgrade:
+          type: boolean
+        grayPercent:
+          type: integer
+          minimum: 0
+          maximum: 100
+        downloadUrl:
+          type: string
+          format: uri
+    OtaCheckResult:
+      type: object
+      properties:
+        hasUpdate:
+          type: boolean
+        reason:
+          type: string
+        package:
+          $ref: '#/components/schemas/OtaPackage'
+    OtaTask:
+      type: object
+      properties:
+        taskId:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        packageId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, downloading, transferring, upgrading, rollback, succeeded, failed, canceled]
+        progressPercent:
+          type: integer
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+    LearningSummary:
+      type: object
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        period:
+          type: string
+          enum: [day, week, month]
+        periodStart:
+          type: string
+          format: date
+        periodEnd:
+          type: string
+          format: date
+        studyMinutes:
+          type: integer
+        recognizedWordCount:
+          type: integer
+        followReadCount:
+          type: integer
+        photoCount:
+          type: integer
+        intercomCallCount:
+          type: integer
+        streakDays:
+          type: integer
+    LearningWord:
+      type: object
+      properties:
+        wordRecordId:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        word:
+          type: string
+        phonetic:
+          type: string
+        meaningCn:
+          type: string
+        audioUrl:
+          type: string
+          format: uri
+        collected:
+          type: boolean
+        recognizedAt:
+          type: string
+          format: date-time
+    ReadingPracticeRecord:
+      type: object
+      properties:
+        practiceId:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        sentenceText:
+          type: string
+        score:
+          type: number
+          format: float
+        issueTags:
+          type: array
+          items:
+            type: string
+        standardAudioUrl:
+          type: string
+          format: uri
+        practicedAt:
+          type: string
+          format: date-time
+    LearningReport:
+      type: object
+      properties:
+        reportId:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        reportType:
+          type: string
+          enum: [daily, weekly, monthly]
+        reportDate:
+          type: string
+          format: date
+        weakTags:
+          type: array
+          items:
+            type: string
+        summaryText:
+          type: string
+        metrics:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+    CheckinPlan:
+      type: object
+      properties:
+        planId:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        enabled:
+          type: boolean
+        tasks:
+          type: array
+          items:
+            type: object
+            properties:
+              taskType:
+                type: string
+                enum: [follow_read_minutes, recognize_words, listen_audio_minutes]
+              targetValue:
+                type: integer
+              targetUnit:
+                type: string
+        updatedAt:
+          type: string
+          format: date-time
+    ContentPackage:
+      type: object
+      properties:
+        packageId:
+          type: string
+          format: uuid
+        packageType:
+          type: string
+          enum: [wordbook, audio]
+        modelCodes:
+          type: array
+          items:
+            type: string
+            enum: [STD, PRO, MAX]
+        category:
+          type: string
+        title:
+          type: string
+        version:
+          type: string
+        fileSizeBytes:
+          type: integer
+        checksumSha256:
+          type: string
+        status:
+          type: string
+          enum: [draft, review, published, archived]
+        autoUpdateEnabled:
+          type: boolean
+        downloadUrl:
+          type: string
+          format: uri
+    PushTokenRegistration:
+      type: object
+      properties:
+        platform:
+          type: string
+          enum: [ios, huawei, xiaomi, oppo, vivo, fcm]
+        pushToken:
+          type: string
+        appVersion:
+          type: string
+        deviceModel:
+          type: string
+    FeedbackTicket:
+      type: object
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+        category:
+          type: string
+          enum: [device_connection, ota, photo_sync, intercom, content_sync, other]
+        title:
+          type: string
+        description:
+          type: string
+        relatedDeviceId:
+          type: string
+          format: uuid
+        attachmentKeys:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [open, processing, resolved, closed]
+        createdAt:
+          type: string
+          format: date-time
+    DeviceStatusReport:
+      type: object
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        modelCode:
+          type: string
+          enum: [STD, PRO, MAX]
+        firmwareVersion:
+          type: string
+        batteryLevel:
+          type: integer
+        onlineStatus:
+          type: string
+          enum: [online, offline, disconnected]
+        bluetoothConnected:
+          type: boolean
+        wifiConnected:
+          type: boolean
+        mode:
+          type: string
+        telemetry:
+          type: object
+          additionalProperties: true
+        reportedAt:
+          type: string
+          format: date-time
+    DeviceLearningBatch:
+      type: object
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        batchId:
+          type: string
+        cursor:
+          type: string
+        stats:
+          type: object
+          properties:
+            studyMinutes:
+              type: integer
+            recognizedWordCount:
+              type: integer
+            followReadCount:
+              type: integer
+            photoCount:
+              type: integer
+            intercomCallCount:
+              type: integer
+        words:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearningWord'
+        practices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReadingPracticeRecord'
+    AdminSession:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+        admin:
+          type: object
+          properties:
+            adminUserId:
+              type: string
+              format: uuid
+            name:
+              type: string
+            phone:
+              type: string
+            roleCode:
+              type: string
+    FirmwarePackage:
+      type: object
+      properties:
+        packageId:
+          type: string
+          format: uuid
+        modelCode:
+          type: string
+          enum: [STD, PRO, MAX]
+        version:
+          type: string
+        minBatteryLevel:
+          type: integer
+          default: 30
+        checksumSha256:
+          type: string
+        fileSizeBytes:
+          type: integer
+        releaseNotes:
+          type: string
+        objectKey:
+          type: string
+        status:
+          type: string
+          enum: [draft, ready, published, archived]
+    FirmwareReleaseJob:
+      type: object
+      properties:
+        releaseJobId:
+          type: string
+          format: uuid
+        packageId:
+          type: string
+          format: uuid
+        releaseMode:
+          type: string
+          enum: [optional, forced]
+        grayPercent:
+          type: integer
+          minimum: 0
+          maximum: 100
+        targetModelCodes:
+          type: array
+          items:
+            type: string
+            enum: [STD, PRO, MAX]
+        startAt:
+          type: string
+          format: date-time
+    FeatureFlag:
+      type: object
+      properties:
+        flagKey:
+          type: string
+        scopeType:
+          type: string
+          enum: [global, model, user_segment]
+        scopeValue:
+          type: string
+        enabled:
+          type: boolean
+        extraConfig:
+          type: object
+          additionalProperties: true
